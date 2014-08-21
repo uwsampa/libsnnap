@@ -109,12 +109,18 @@ A "blocking write" may need to read before it can write:
 
 */
 
+/* Check whether it is safe to call `snnap_writebuf()`, i.e., there is an open
+ * slot for new inputs to the NPU (the current input buffer is not full).
+ */
 bool snnap_canwrite() {
     // This is only false when we've come "around the loop" back to a buffer
     // that has been submitted but not consumed.
     return !ibf[ibn];
 }
 
+/* Get a pointer to the buffer where inputs should be written. Precondition:
+ * the current input buffer is not full.
+ */
 char *snnap_writebuf() {
     assert(!ibf[ibn]);
     assert(!obf[ibn]);
@@ -123,10 +129,15 @@ char *snnap_writebuf() {
     return ibuf[ibn];
 }
 
+/* Invoke the NPU on the most recently written NPU. Move to the next input
+ * buffer. Precondition: the current write buffer is full but has not been
+ * invoked yet.
+ */
 void snnap_sendbuf() {
     assert(ibf[ibn]);
     assert(!obf[ibn]);
     assert(!invoked[ibn]);
     invoked[ibn] = true;
+    INCR_BUF(ibn);
     // TODO notify the NPU
 }
