@@ -3,8 +3,8 @@
 
 static const unsigned NBUFS = 2;  // Number of input & output buffers.
 static const unsigned BUFSIZE = 64;  // Size of each buffer in bytes.
-static volatile char (* const ibuf)[BUFSIZE] = (void*) 0xFFFF8000;
-static volatile char (* const obuf)[BUFSIZE] = (void*) 0xFFFFF000;
+static volatile void * const ibuf_begin = (void*) 0xFFFF8000;
+static volatile void * const obuf_begin = (void*) 0xFFFFF000;
 static unsigned ibn;  // Which buffer is current?
 static unsigned obn;
 static bool ibf[NBUFS];  // Full flag for each buffer.
@@ -13,16 +13,27 @@ static bool invoked[NBUFS];  // Whether the NPU has actually been invoked.
 
 #define INCR_BUF(n) n = (n + 1) % NBUFS
 
+// ARM data synchronization barrier.
 static void dsb() {
     __asm__ __volatile__ ("dsb" : : : "memory");
 }
 
+// Send event.
 static void sev() {
     __asm__ __volatile__ ("SEV\n");
 }
 
+// Wait for event (maybe).
 static void wfe() {
     __asm__ __volatile__ ("WFE\n");
+}
+
+// Index calculations.
+static volatile void *ibuf(unsigned n) {
+    return ibuf_begin + BUFSIZE * n;
+}
+static volatile void *obuf(unsigned n) {
+    return obuf_begin + BUFSIZE * n;
 }
 
 void snnap_init() {
@@ -42,10 +53,10 @@ bool snnap_canread() {
     return obf[obn];
 }
 
-const volatile char *snnap_readbuf() {
+const volatile void *snnap_readbuf() {
     assert(invoked[obn]);
     assert(obf[obn]);
-    return obuf[obn];
+    return obuf(obn);
 }
 
 void snnap_consumebuf() {
@@ -72,12 +83,12 @@ bool snnap_canwrite() {
     return !ibf[ibn];
 }
 
-volatile char *snnap_writebuf() {
+volatile void *snnap_writebuf() {
     assert(!ibf[ibn]);
     assert(!obf[ibn]);
     assert(!invoked[ibn]);
     ibf[ibn] = true;
-    return ibuf[ibn];
+    return ibuf(ibn);
 }
 
 void snnap_sendbuf() {

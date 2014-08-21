@@ -33,7 +33,7 @@ bool snnap_canread();
 /* Get the most recent output data from the NPU. Precondition: the current
  * output buffer must be full.
  */
-const volatile char *snnap_readbuf();
+const volatile void *snnap_readbuf();
 
 /* "Free" the current output buffer to indicate that it can be filled by
  * another invocation. Precondition: the buffer must be full (i.e., don't call
@@ -79,7 +79,7 @@ bool snnap_canwrite();
 /* Get a pointer to the buffer where inputs should be written. Precondition:
  * the current input buffer is not full.
  */
-volatile char *snnap_writebuf();
+volatile void *snnap_writebuf();
 
 /* Invoke the NPU on the most recently written NPU. Move to the next input
  * buffer. Precondition: the current write buffer is full but has not been
