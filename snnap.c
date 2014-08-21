@@ -3,12 +3,12 @@
 
 static const unsigned NBUFS = 2;  // Number of input & output buffers.
 static const unsigned BUFSIZE = 64;  // Size of each buffer in bytes.
-static char (* const ibuf)[BUFSIZE] = (void*) 0xFFFF8000;
-static char (* const obuf)[BUFSIZE] = (void*) 0xFFFFF000;
+static volatile char (* const ibuf)[BUFSIZE] = (void*) 0xFFFF8000;
+static volatile char (* const obuf)[BUFSIZE] = (void*) 0xFFFFF000;
 static unsigned ibn;  // Which buffer is current?
 static unsigned obn;
 static bool ibf[NBUFS];  // Full flag for each buffer.
-static bool obf[NBUFS];  // TODO the NPU needs to set these ones.
+volatile static bool obf[NBUFS];  // TODO the NPU needs to set these ones.
 static bool invoked[NBUFS];  // Whether the NPU has actually been invoked.
 
 #define INCR_BUF(n) n = (n + 1) % NBUFS
@@ -67,7 +67,7 @@ bool snnap_canread() {
 /* Get the most recent output data from the NPU. Precondition: the current
  * output buffer must be full.
  */
-const char *snnap_readbuf() {
+const volatile char *snnap_readbuf() {
     assert(invoked[obn]);
     assert(obf[obn]);
     return obuf[obn];
@@ -135,7 +135,7 @@ bool snnap_canwrite() {
 /* Get a pointer to the buffer where inputs should be written. Precondition:
  * the current input buffer is not full.
  */
-char *snnap_writebuf() {
+volatile char *snnap_writebuf() {
     assert(!ibf[ibn]);
     assert(!obf[ibn]);
     assert(!invoked[ibn]);
