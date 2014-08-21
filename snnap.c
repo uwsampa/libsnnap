@@ -3,8 +3,8 @@
 
 static const unsigned NBUFS = 2;  // Number of input & output buffers.
 static const unsigned BUFSIZE = 64;  // Size of each buffer in bytes.
-static char (* const ibuf)[BUFSIZE] = (void*) 0xDEF;
-static char (* const obuf)[BUFSIZE] = (void*) 0xABC;
+static char (* const ibuf)[BUFSIZE] = (void*) 0xFFFF8000;
+static char (* const obuf)[BUFSIZE] = (void*) 0xFFFFF000;
 static unsigned ibn;  // Which buffer is current?
 static unsigned obn;
 static bool ibf[NBUFS];  // Full flag for each buffer.
@@ -13,6 +13,20 @@ static bool invoked[NBUFS];  // Whether the NPU has actually been invoked.
 
 #define INCR_BUF(n) n = (n + 1) % NBUFS
 
+static void dsb() {
+    __asm__ __volatile__ ("dsb" : : : "memory");
+}
+
+static void sev() {
+    __asm__ __volatile__ ("SEV\n");
+}
+
+static void wfe() {
+    __asm__ __volatile__ ("WFE\n");
+}
+
+/* Initialize the library's state.
+ */
 void snnap_init() {
     ibn = 0;
     obn = 0;
@@ -82,7 +96,7 @@ void snnap_block() {
     assert(ibf[obn]);
     assert(invoked[obn]);
     while (!obf[obn]) {
-        // TODO sleep for NPU signal
+        wfe();  // TODO Check this.
     }
 }
 
@@ -139,5 +153,8 @@ void snnap_sendbuf() {
     assert(!invoked[ibn]);
     invoked[ibn] = true;
     INCR_BUF(ibn);
-    // TODO notify the NPU
+
+    // TODO Check this.
+    dsb();
+    sev();
 }
