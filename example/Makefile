@@ -28,9 +28,10 @@ clean:
 	rm -rf $(OBJECTS) $(EXECUTABLE)
 
 run: $(EXECUTABLE)
-	wmo switch zynq$(ZYNQ) off
+	wemo switch zynq$(ZYNQ) off
 	sleep 3s
 	wemo switch zynq$(ZYNQ) on
 	sleep 3s
 	source $(SETTINGS) ; \
 		xmd -tcl $(RUN_TCL) $(ZYNQBIT) $(PS7_INIT) $(EXECUTABLE)
+	cp /sampa/share/thierry/minicom$(ZYNQ).out log.txt
