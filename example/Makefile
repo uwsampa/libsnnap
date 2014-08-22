@@ -5,7 +5,8 @@ EXECUTABLE = inversek2j.elf
 LIBDIR := /sampa/share/thierry/benchmarks/BenchNN/lib
 TOOLCHAIN := /sampa/share/Xilinx/14.6/14.6/ISE_DS/EDK/gnu/arm/lin
 CC := $(TOOLCHAIN)/bin/arm-xilinx-eabi-gcc
-LDFLAGS := -Wl,-T -Wl,$(ZYNQDIR)/lscript.ld -L$(LIBDIR)/bsp/lib
+CFLAGS += -I.. -I$(LIBDIR)/bsp/include -D_GNU_SOURCE=1 -std=c99
+LDFLAGS := -Wl,-T -Wl,$(LIBDIR)/lscript.ld -L$(LIBDIR)/bsp/lib
 LIBS := -Wl,--start-group,-lxil,-lgcc,-lc,-lm,--end-group
 
 SETTINGS := /sampa/share/Xilinx/14.6/14.6/ISE_DS/settings64.sh
@@ -19,6 +20,9 @@ ZYNQBIT := inversek2j_x8_x64.bit
 .PHONY: all clean run
 
 all: $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
 
 clean:
 	rm -rf $(OBJECTS) $(EXECUTABLE)
