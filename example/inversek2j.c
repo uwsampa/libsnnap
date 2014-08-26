@@ -39,9 +39,7 @@ long long int dynInsn_kernel_approx;
 // NPU data consumption.
 float * dstData;
 void callback(const volatile void *data) {
-    const volatile float *fdata = data;
-    dstData[0] = fdata[0];
-    dstData[1] = fdata[1];
+    memcpy(dstData, (const float *)data, NUM_OUTPUTS * sizeof(float));
     dstData += NUM_INPUTS;
 }
 
@@ -130,8 +128,7 @@ int main (int argc, const char* argv[]) {
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
         srcData = xy + i;
         volatile float *iBuff = snnap_stream_write(stream);
-        iBuff[0] = srcData[0];
-        iBuff[1] = srcData[1];
+        memcpy((float *)iBuff, srcData, NUM_INPUTS * sizeof(float));
         snnap_stream_send(stream);
     }
 
