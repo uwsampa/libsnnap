@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <math.h>
 #include "snnap.h"
+#include <string.h>
 
 #include "kinematics.h"
 
@@ -23,17 +24,26 @@
 // TIMER:
 // 0 - Use ARM performance counters
 // 1 - Use FPGA clock counter
-#define TIMER           1 
+#define TIMER           1
 // POWER MODE:
 // 0 - Normal operation
 // 1 - Loop on precise execution
 // 2 - Loop on approximate execution
-#define POWER_MODE      0 
+#define POWER_MODE      0
 
 // Global variables
 long long int t_kernel_precise;
 long long int t_kernel_approx;
 long long int dynInsn_kernel_approx;
+
+// NPU data consumption.
+float * dstData;
+void callback(const volatile void *data) {
+    const volatile float *fdata = data;
+    dstData[0] = fdata[0];
+    dstData[1] = fdata[1];
+    dstData += NUM_INPUTS;
+}
 
 
 int main (int argc, const char* argv[]) {
@@ -60,10 +70,10 @@ int main (int argc, const char* argv[]) {
     t_kernel_precise = 0;
     t_kernel_approx = 0;
     dynInsn_kernel_approx = 0;
-    
+
     // Init rand number generator:
     srand (1);
-    
+
     // Set input size to 100000 if not set
     if (argc < 2) {
         n = 4096;
@@ -71,19 +81,19 @@ int main (int argc, const char* argv[]) {
         n = atoi(argv[1]);
     }
     assert (n%(BUFFER_SIZE)==0);
-    
+
     // Allocate input and output arrays
     float* xy           = (float*)malloc(n * 2 * sizeof (float));
     float* xy_approx    = (float*)malloc(n * 2 * sizeof (float));
     float* t1t2_precise = (float*)malloc(n * 2 * sizeof (float));
     float* t1t2_approx  = (float*)malloc(n * 2 * sizeof (float));
-    
+
     // Ensure memory allocation was successful
     if(t1t2_approx == NULL || t1t2_precise == NULL || xy == NULL) {
         printf("Cannot allocate memory!\n");
         return -1;
     }
-    
+
     // Initialize input data
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
         x = rand();
@@ -92,61 +102,42 @@ int main (int argc, const char* argv[]) {
         t1t2_precise[i + 1] = (((float)x)/RAND_MAX) *  PI / 2;
         forwardk2j(t1t2_precise[i + 0], t1t2_precise[i + 1], xy + (i + 0), xy + (i + 1));
     }
-    
+
     printf("\n\nRunning inversek2j benchmark on %u inputs\n\n", n);
 
-    
+
     ///////////////////////////////
     // 2 - Precise execution
     ///////////////////////////////
-    
-    
 
-        for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
-        
-
-            inversek2j(xy[i + 0], xy[i + 1], t1t2_precise + (i + 0), t1t2_precise + (i + 1));
-
-
-        }
-    
-
-    
+    for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
+        inversek2j(xy[i + 0], xy[i + 1], t1t2_precise + (i + 0), t1t2_precise + (i + 1));
+    }
 
 
     ///////////////////////////////
     // 3 - Approximate execution
     ///////////////////////////////
-    
+
     // Pointers NPU based inversek2j
     float * srcData;
-    float * dstData;
-    
+    dstData = t1t2_approx;
 
-    
     snnap_init();
-    
-        
-        // NPU OFFLOADING
-        for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS * BUFFER_SIZE){
-        
-            
-            srcData = (xy + i);
-            dstData = (t1t2_approx + i);
-            volatile float *iBuff = snnap_writebuf();
-            for(j = 0; j < NUM_INPUTS * BUFFER_SIZE; j++) {
-                *(iBuff++) = *(srcData ++);
-            }
-            snnap_block();
-            volatile const float *oBuff = snnap_readbuf();
-            for(j = 0; j < NUM_OUTPUTS * BUFFER_SIZE; j++) {
-                *(dstData++) = *(oBuff ++);
-            }
-            snnap_consumebuf();
-            
+    struct snnap_stream *stream = snnap_stream_new(NUM_INPUTS * sizeof(float),
+            NUM_OUTPUTS * sizeof(float), callback);
 
-        }
-        
+    for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
+        srcData = xy + i;
+        volatile float *iBuff = snnap_stream_write(stream);
+        iBuff[0] = srcData[0];
+        iBuff[1] = srcData[1];
+        snnap_stream_send(stream);
+    }
+
+    snnap_stream_barrier(stream);
+    free(stream);
+
 /*
 int k;
 for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
@@ -154,19 +145,19 @@ for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
           */
 
     //andreolb
-    //dynInsn_approx = get_eventcount(0) - dynInsn_approx; 
-    
-    
-    
+    //dynInsn_approx = get_eventcount(0) - dynInsn_approx;
+
+
+
     ///////////////////////////////
     // 4 - Compute RMSE
     ///////////////////////////////
-    
+
     // Perform forward kinematics on approx thetas
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
         forwardk2j(t1t2_approx[i + 0], t1t2_approx[i + 1], xy_approx + (i + 0), xy_approx + (i + 1));
     }
-    
+
     // Compute RMSE and NRMSE
     double RMSE = 0;
     double NRMSE = 0;
@@ -200,19 +191,19 @@ for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
     diff1 = max1 - min1;
     RMSE = sqrt(RMSE);
     NRMSE = RMSE/(sqrt(diff0+diff1));
-    
-    
+
+
     ///////////////////////////////
     // 5 - Report results
     ///////////////////////////////
 
     printf("==> RMSE = %.4f (NRMSE = %.2f%%)\n", (float) RMSE, (float) ((100.*NRMSE)));
-    
+
 
     ///////////////////////////////
     // 6 - Free memory
     ///////////////////////////////
-    
+
     free(t1t2_precise);
     free(t1t2_approx);
     free(xy);
