@@ -1,5 +1,6 @@
 #include "snnap.h"
 #include <assert.h>
+#include <stdlib.h>
 
 static const unsigned NBUFS = 2;  // Number of input & output buffers.
 static const unsigned BUFSIZE = 4096;  // Size of each buffer in bytes.
@@ -53,6 +54,8 @@ void snnap_init() {
     }
 }
 
+/** reading by buffer **/
+
 bool snnap_canread() {
     assert(ibf[obn]);
     assert(invoked[obn]);
@@ -83,6 +86,8 @@ void snnap_block() {
     }
 }
 
+/** writing by buffer **/
+
 bool snnap_canwrite() {
     // This is only false when we've come "around the loop" back to a buffer
     // that has been submitted but not consumed.
@@ -107,4 +112,81 @@ void snnap_sendbuf() {
     // TODO Check this.
     dsb();
     sev();
+}
+
+/** stream interface **/
+
+struct snnap_stream {
+    unsigned inputSize;
+    unsigned outputSize;
+    unsigned numInvocations[NBUFS];
+    void (*callback)(const volatile void *);
+};
+
+struct snnap_stream *snnap_stream_new(
+        unsigned iSize, unsigned oSize, void (*callback)(const volatile void *)
+) {
+    struct snnap_stream *stream = malloc(sizeof(struct snnap_stream));
+    stream->inputSize = iSize;
+    stream->outputSize = oSize;
+    for (unsigned i = 0; i < NBUFS; ++i) {
+        stream->numInvocations[i] = 0;
+    }
+    stream->callback = callback;
+    return stream;
+}
+
+static unsigned stream_pos(struct snnap_stream *stream) {
+    return stream->numInvocations[ibn] * stream->inputSize;
+}
+
+static void stream_consume(struct snnap_stream *stream) {
+    snnap_block();
+    const volatile void *buf = snnap_readbuf();
+    const volatile void *bufEnd = buf +
+        stream->numInvocations[obn] * stream->outputSize;
+    for (const volatile void *pos = buf; pos < bufEnd; ++pos) {
+        stream->callback(pos);
+    }
+    snnap_consumebuf();
+    stream->numInvocations[obn] = 0;
+}
+
+volatile void *snnap_stream_write(struct snnap_stream *stream) {
+    // Make sure we have room to write by consuming prior invocations.
+    if (!snnap_canwrite()) {
+        stream_consume(stream);
+    }
+    assert(snnap_canwrite());
+
+    unsigned ipos = stream_pos(stream);
+    assert(ipos + stream->inputSize < BUFSIZE);
+    return snnap_writebuf() + ipos;
+}
+
+void snnap_stream_send(struct snnap_stream *stream) {
+    ++(stream->numInvocations[ibn]);
+    unsigned ipos = stream_pos(stream);
+    assert(ipos < BUFSIZE);
+    if (ipos + stream->inputSize >= BUFSIZE) {
+        // Next invocation would fill the buffer. Send.
+        snnap_sendbuf();
+    }
+}
+
+void snnap_stream_barrier(struct snnap_stream *stream) {
+    // Finish the last invocation, if anything has been enqueued.
+    if (stream->numInvocations[ibn]) {
+        snnap_sendbuf();
+    }
+
+    // Cycle through all buffers and check for in-flight invocations.
+    unsigned obnOrig = obn;
+    for (obn = 0; obn < NBUFS; ++obn) {
+        if (stream->numInvocations[obn]) {
+            assert(invoked[obn]);
+            stream_consume(stream);
+        }
+    }
+    obn = obnOrig;
 }

@@ -1,5 +1,5 @@
-#ifndef __SNAP_H
-#define __SNAP_H
+#ifndef SNNAP_H
+#define SNNAP_H
 
 #include <stdbool.h>
 
@@ -86,5 +86,49 @@ volatile void *snnap_writebuf();
  * invoked yet.
  */
 void snnap_sendbuf();
+
+/* The stream-based interface provides an alternative.
+
+You need to define a callback:
+
+    void handle(const volatile void *data) {
+        // Read N bytes of data.
+    }
+
+Then invoke like this:
+
+    struct snnap_stream *stream = snnap_stream_new(N, M, handle);
+    for (...) {
+        *snnap_stream_write(steam) = data;
+        snnap_stream_send(stream);
+    }
+    snnap_stream_barrier(stream);
+    free(stream);
+
+*/
+
+/* The snnap_stream encapsulates the state for a "streaming" invocation of the
+ * accelerator. Initialize it by passing the size of your inputs, the size of
+ * the neural network's outputs (both in bytes), and a callback function. The
+ * callback will be invoked with each output element in the same order the
+ * inputs are sent.
+*/
+struct snnap_stream;
+struct snnap_stream *snnap_stream_new(unsigned iSize, unsigned oSize,
+        void (*callback)(const volatile void *));
+
+/* Write a single input to the stream. Use the returned pointer to write
+ * exactly the number of bytes declared as the input size for this stream.
+ */
+volatile void *snnap_stream_write(struct snnap_stream *stream);
+
+/* Mark the end of writing an input. Call this after every invocation of
+ * snnap_stream_write() before moving on to the next input.
+ */
+void snnap_stream_send(struct snnap_stream *stream);
+
+/* Consume all outputs from the stream.
+ */
+void snnap_stream_barrier(struct snnap_stream *stream);
 
 #endif
