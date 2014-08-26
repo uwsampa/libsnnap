@@ -1,8 +1,11 @@
-#include "snnap.h"
 #include <assert.h>
 #include <stdlib.h>
+#include "xil_types.h"
+#include "xil_mmu.h"
 
-static const unsigned NBUFS = 2;  // Number of input & output buffers.
+#include "snnap.h"
+
+#define NBUFS 1
 static const unsigned BUFSIZE = 4096;  // Size of each buffer in bytes.
 static volatile void * const ibuf_begin = (void*) 0xFFFF0000;
 static volatile void * const obuf_begin = (void*) 0xFFFF8000;
@@ -45,6 +48,10 @@ static volatile bool *obf(unsigned n) {
 }
 
 void snnap_init() {
+    // TLB page settings.
+    Xil_SetTlbAttributes((u32) ibuf_begin, 0x15C06);
+    Xil_SetTlbAttributes((u32) obuf_begin, 0x15C06);
+
     ibn = 0;
     obn = 0;
     for (unsigned i = 0; i < NBUFS; ++i) {
