@@ -128,6 +128,7 @@ struct snnap_stream {
     unsigned outputSize;
     unsigned numInvocations[NBUFS];
     void (*callback)(const volatile void *);
+    volatile void *openIbuf;
 };
 
 struct snnap_stream *snnap_stream_new(
@@ -140,6 +141,7 @@ struct snnap_stream *snnap_stream_new(
         stream->numInvocations[i] = 0;
     }
     stream->callback = callback;
+    stream->openIbuf = 0;
     return stream;
 }
 
@@ -160,15 +162,18 @@ static void stream_consume(struct snnap_stream *stream) {
 }
 
 volatile void *snnap_stream_write(struct snnap_stream *stream) {
-    // Make sure we have room to write by consuming prior invocations.
-    if (!snnap_canwrite()) {
-        stream_consume(stream);
+    if (!stream->openIbuf) {
+        // No buffer currently open. Get the next one.
+        // Make sure we have room to write by consuming prior invocations.
+        if (!snnap_canwrite()) {
+            stream_consume(stream);
+        }
+        stream->openIbuf = snnap_writebuf();
     }
-    assert(snnap_canwrite());
 
     unsigned ipos = stream_pos(stream);
     assert(ipos + stream->inputSize < BUFSIZE);
-    return snnap_writebuf() + ipos;
+    return stream->openIbuf + ipos;
 }
 
 void snnap_stream_send(struct snnap_stream *stream) {
@@ -178,6 +183,7 @@ void snnap_stream_send(struct snnap_stream *stream) {
     if (ipos + stream->inputSize >= BUFSIZE) {
         // Next invocation would fill the buffer. Send.
         snnap_sendbuf();
+        stream->openIbuf = 0;
     }
 }
 
