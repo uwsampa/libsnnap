@@ -51,6 +51,8 @@ int main (int argc, const char* argv[]) {
     int x;
     int n;
 
+    printf("Hello!\n");
+
 
     ///////////////////////////////
     // 1 - Initialization

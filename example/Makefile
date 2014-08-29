@@ -16,6 +16,7 @@ RUN_TCL := $(TCL_DIR)/run_benchmark.tcl
 
 ZYNQ := 2
 ZYNQBIT := inversek2j_x8_x64.bit
+MINICOM := /sampa/share/thierry/minicom$(ZYNQ).out
 
 .PHONY: all clean run
 
@@ -28,10 +29,11 @@ clean:
 	rm -rf $(OBJECTS) $(EXECUTABLE)
 
 run: $(EXECUTABLE)
+	cat /dev/null > $(MINICOM)
 	wemo switch zynq$(ZYNQ) off
 	sleep 3s
 	wemo switch zynq$(ZYNQ) on
 	sleep 3s
 	source $(SETTINGS) ; \
 		xmd -tcl $(RUN_TCL) $(ZYNQBIT) $(PS7_INIT) $(EXECUTABLE)
-	cp /sampa/share/thierry/minicom$(ZYNQ).out log.txt
+	cp $(MINICOM) log.txt
