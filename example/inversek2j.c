@@ -131,7 +131,6 @@ int main (int argc, const char* argv[]) {
         
         // NPU OFFLOADING
         for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS * BUFFER_SIZE){
-        
             
             srcData = (xy + i);
             dstData = (t1t2_approx + i);
@@ -139,6 +138,7 @@ int main (int argc, const char* argv[]) {
             for(j = 0; j < NUM_INPUTS * BUFFER_SIZE; j++) {
                 *(iBuff++) = *(srcData ++);
             }
+            snnap_sendbuf();
             snnap_block();
             volatile const float *oBuff = snnap_readbuf();
             for(j = 0; j < NUM_OUTPUTS * BUFFER_SIZE; j++) {
