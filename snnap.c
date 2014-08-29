@@ -42,7 +42,7 @@ static volatile void *obuf(unsigned n) {
 // breaking if the output has a zero in this position.
 // N.B. This is a difference from npu.h, which uses the last byte of the
 // output, so we don't need to know the output width.
-static volatile bool *obf(unsigned n) {
+static volatile int *obf(unsigned n) {
     return obuf(n) + 3;
 }
 
@@ -63,7 +63,7 @@ void snnap_init() {
 bool snnap_canread() {
     assert(ibf[obn]);
     assert(invoked[obn]);
-    return *obf(obn);
+    return !!(*obf(obn));
 }
 
 const volatile void *snnap_readbuf() {
@@ -76,7 +76,7 @@ void snnap_consumebuf() {
     assert(*obf(obn));
     assert(ibf[obn]);
     assert(invoked[obn]);
-    *obf(obn) = false;
+    *obf(obn) = 0;
     ibf[obn] = false;
     invoked[obn] = false;
     INCR_BUF(obn);
@@ -98,7 +98,7 @@ bool snnap_canwrite() {
 
 volatile void *snnap_writebuf() {
     assert(!ibf[ibn]);
-    assert(*obf(ibn));
+    assert(!*obf(ibn));
     assert(!invoked[ibn]);
     ibf[ibn] = true;
     return ibuf(ibn);
@@ -106,7 +106,7 @@ volatile void *snnap_writebuf() {
 
 void snnap_sendbuf() {
     assert(ibf[ibn]);
-    assert(*obf(ibn));
+    assert(!*obf(ibn));
     assert(!invoked[ibn]);
     invoked[ibn] = true;
     INCR_BUF(ibn);
