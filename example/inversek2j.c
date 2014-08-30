@@ -13,72 +13,46 @@
 #include "snnap.h"
 #include <string.h>
 
-#include "kinematics.h"
-
 #define PI 3.14159265
 
-// Inversek2j parameters
+// Kernel parameters.
 #define NUM_INPUTS      2
 #define NUM_OUTPUTS     2
 #define BUFFER_SIZE     64
-// TIMER:
-// 0 - Use ARM performance counters
-// 1 - Use FPGA clock counter
-#define TIMER           1
-// POWER MODE:
-// 0 - Normal operation
-// 1 - Loop on precise execution
-// 2 - Loop on approximate execution
-#define POWER_MODE      0
 
-// Global variables
-long long int t_kernel_precise;
-long long int t_kernel_approx;
-long long int dynInsn_kernel_approx;
+// Kinematics functions.
+const float l1 = 0.5;
+const float l2 = 0.5;
+void forwardk2j(float theta1, float theta2, float* x, float* y) {
+    *x = l1 * cos(theta1) + l2 * cos(theta1 + theta2);
+    *y = l1 * sin(theta1) + l2 * sin(theta1 + theta2);
+}
+void inversek2j(float x, float y, float* theta1, float* theta2) {
+    *theta2 = acos(((x * x) + (y * y) - (l1 * l1) - (l2 * l2))/(2 * l1 * l2));
+    *theta1 = asin((y * (l1 + l2 * cos(*theta2)) - x * l2 * sin(*theta2))/(x * x + y * y));
+}
 
-// NPU data consumption.
+// NPU data consumption callback.
 float * dstData;
 void callback(const volatile void *data) {
     memcpy(dstData, (const float *)data, NUM_OUTPUTS * sizeof(float));
     dstData += NUM_INPUTS;
 }
 
-
 int main (int argc, const char* argv[]) {
-
     // Performance counters
     unsigned int t_precise;
     unsigned int t_approx;
-    unsigned int dynInsn_precise;
-    unsigned int dynInsn_approx;
     unsigned int evt_counter[1] = {0x68};
 
     // Inversek2j variables
     int i;
     int j;
     int x;
-    int n;
-
-
-    ///////////////////////////////
-    // 1 - Initialization
-    ///////////////////////////////
-
-    // Init performance counters:
-    t_kernel_precise = 0;
-    t_kernel_approx = 0;
-    dynInsn_kernel_approx = 0;
+    int n = 4096;
 
     // Init rand number generator:
     srand (1);
-
-    // Set input size to 100000 if not set
-    if (argc < 2) {
-        n = 4096;
-    } else {
-        n = atoi(argv[1]);
-    }
-    assert (n%(BUFFER_SIZE)==0);
 
     // Allocate input and output arrays
     float* xy           = (float*)malloc(n * 2 * sizeof (float));
@@ -104,18 +78,14 @@ int main (int argc, const char* argv[]) {
     printf("\n\nRunning inversek2j benchmark on %u inputs\n\n", n);
 
 
-    ///////////////////////////////
-    // 2 - Precise execution
-    ///////////////////////////////
+    /*** BASELINE (PRECISE) EXECUTION ***/
 
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
         inversek2j(xy[i + 0], xy[i + 1], t1t2_precise + (i + 0), t1t2_precise + (i + 1));
     }
 
 
-    ///////////////////////////////
-    // 3 - Approximate execution
-    ///////////////////////////////
+    /*** NPU EXECUTION ***/
 
     // Pointers NPU based inversek2j
     float * srcData;
@@ -135,20 +105,8 @@ int main (int argc, const char* argv[]) {
     snnap_stream_barrier(stream);
     free(stream);
 
-/*
-int k;
-for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
-          printf("\n%f\t%f", *(t1t2_approx + (k + 0)), *(t1t2_approx + (k + 1)));
-          */
 
-    //andreolb
-    //dynInsn_approx = get_eventcount(0) - dynInsn_approx;
-
-
-
-    ///////////////////////////////
-    // 4 - Compute RMSE
-    ///////////////////////////////
+    /*** REPORTING ***/
 
     // Perform forward kinematics on approx thetas
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
@@ -180,7 +138,6 @@ for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
             diff0 = xy[i+0] - xy_approx[i+0];
             diff1 = xy[i+1] - xy_approx[i+1];
             RMSE += (diff0*diff0+diff1*diff1);
-            //printf("Hello Andre, the RMSE is %f\n", RMSE);
         }
     }
     RMSE = RMSE/total;
@@ -189,17 +146,7 @@ for (k = 0; k < n * NUM_INPUTS; k += NUM_INPUTS)
     RMSE = sqrt(RMSE);
     NRMSE = RMSE/(sqrt(diff0+diff1));
 
-
-    ///////////////////////////////
-    // 5 - Report results
-    ///////////////////////////////
-
     printf("==> RMSE = %.4f (NRMSE = %.2f%%)\n", (float) RMSE, (float) ((100.*NRMSE)));
-
-
-    ///////////////////////////////
-    // 6 - Free memory
-    ///////////////////////////////
 
     free(t1t2_precise);
     free(t1t2_approx);

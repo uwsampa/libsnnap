@@ -1,4 +1,4 @@
-SOURCES = inversek2j.c kinematics.c ../snnap.c
+SOURCES = inversek2j.c ../snnap.c
 OBJECTS = $(SOURCES:%.c=%.o)
 EXECUTABLE = inversek2j.elf
 
