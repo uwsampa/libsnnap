@@ -102,10 +102,7 @@ int main (int argc, const char* argv[]) {
             NUM_OUTPUTS * sizeof(float), callback);
 
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
-        srcData = xy + i;
-        volatile float *iBuff = snnap_stream_write(stream);
-        memcpy((float *)iBuff, srcData, NUM_INPUTS * sizeof(float));
-        snnap_stream_send(stream);
+        snnap_stream_put(stream, xy + i);
     }
 
     snnap_stream_barrier(stream);

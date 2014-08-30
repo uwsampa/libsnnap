@@ -188,6 +188,12 @@ void snnap_stream_send(struct snnap_stream *stream) {
     }
 }
 
+void snnap_stream_put(struct snnap_stream *stream, const void *data) {
+    volatile void *buf = snnap_stream_write(stream);
+    memcpy(buf, data, stream->inputSize);
+    snnap_stream_send(stream);
+}
+
 void snnap_stream_barrier(struct snnap_stream *stream) {
     // Finish the last invocation, if anything has been enqueued.
     if (stream->numInvocations[ibn]) {
