@@ -7,7 +7,7 @@
 #include "snnap.h"
 
 #define NBUFS 1
-static const unsigned BUFSIZE = 4096;  // Size of each buffer in bytes.
+static const unsigned BUFSIZE = 512;  // Size of each buffer in bytes.
 static volatile void * const ibuf_begin = (void*) 0xFFFF0000;
 static volatile void * const obuf_begin = (void*) 0xFFFF8000;
 static unsigned ibn;  // Which buffer is current?
