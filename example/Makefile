@@ -20,7 +20,7 @@ MINICOM := /sampa/share/thierry/minicom$(ZYNQ).out
 
 # Use the stream interface unless told otherwise.
 ifneq ($(STREAM),0)
-CFLAGS += DNPU_STREAM
+CFLAGS += -DNPU_STREAM
 endif
 
 .PHONY: all clean run

@@ -115,6 +115,7 @@ int main (int argc, const char* argv[]) {
 
     // Lower-level interface with explicit buffer management.
 
+    snnap_init();
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS * BUFFER_SIZE){
         srcData = (xy + i);
         dstData = (t1t2_approx + i);
