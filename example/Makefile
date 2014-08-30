@@ -18,6 +18,11 @@ ZYNQ := 2
 ZYNQBIT := inversek2j_x8_x64.bit
 MINICOM := /sampa/share/thierry/minicom$(ZYNQ).out
 
+# Use the stream interface unless told otherwise.
+ifneq ($(STREAM),0)
+CFLAGS += DNPU_STREAM
+endif
+
 .PHONY: all clean run
 
 all: $(EXECUTABLE)
@@ -38,3 +43,4 @@ run: $(EXECUTABLE)
 		xmd -tcl $(RUN_TCL) $(ZYNQBIT) $(PS7_INIT) $(EXECUTABLE)
 	sleep 3
 	cp $(MINICOM) log.txt
+	cat log.txt

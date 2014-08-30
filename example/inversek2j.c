@@ -4,6 +4,7 @@
  *  Created on: Dec 6, 2011
  *      Authors: Hadi Esmaeilzadeh <hadianeh@cs.washington.edu>
  *               Thierry Moreau <moreau@cs.washington.edu>
+ *               Adrian Sampson <asampson@cs.washington.edu>
  */
 
 #include <stdio.h>
@@ -32,12 +33,16 @@ void inversek2j(float x, float y, float* theta1, float* theta2) {
     *theta1 = asin((y * (l1 + l2 * cos(*theta2)) - x * l2 * sin(*theta2))/(x * x + y * y));
 }
 
-// NPU data consumption callback.
+float * srcData;
 float * dstData;
+
+#ifdef NPU_STREAM
+// NPU data consumption callback.
 void callback(const volatile void *data) {
     memcpy(dstData, (const float *)data, NUM_OUTPUTS * sizeof(float));
     dstData += NUM_INPUTS;
 }
+#endif
 
 int main (int argc, const char* argv[]) {
     // Performance counters
@@ -87,10 +92,11 @@ int main (int argc, const char* argv[]) {
 
     /*** NPU EXECUTION ***/
 
-    // Pointers NPU based inversek2j
-    float * srcData;
-    dstData = t1t2_approx;
+#ifdef NPU_STREAM
 
+    // Simpler streaming interface.
+
+    dstData = t1t2_approx;  // For the callback.
     snnap_init();
     struct snnap_stream *stream = snnap_stream_new(NUM_INPUTS * sizeof(float),
             NUM_OUTPUTS * sizeof(float), callback);
@@ -104,6 +110,29 @@ int main (int argc, const char* argv[]) {
 
     snnap_stream_barrier(stream);
     free(stream);
+
+#else
+
+    // Lower-level interface with explicit buffer management.
+
+    for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS * BUFFER_SIZE){
+        srcData = (xy + i);
+        dstData = (t1t2_approx + i);
+        volatile float *iBuff = snnap_writebuf();
+        for(j = 0; j < NUM_INPUTS * BUFFER_SIZE; j++) {
+            *(iBuff++) = *(srcData ++);
+        }
+        snnap_sendbuf();
+        snnap_block();
+        volatile const float *oBuff = snnap_readbuf();
+        for(j = 0; j < NUM_OUTPUTS * BUFFER_SIZE; j++) {
+            *(dstData++) = *(oBuff ++);
+        }
+        snnap_consumebuf();
+    }
+
+#endif
+
 
 
     /*** REPORTING ***/
