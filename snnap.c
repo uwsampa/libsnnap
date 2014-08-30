@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include "xil_types.h"
 #include "xil_mmu.h"
 
@@ -173,15 +174,15 @@ volatile void *snnap_stream_write(struct snnap_stream *stream) {
     }
 
     unsigned ipos = stream_pos(stream);
-    assert(ipos + stream->inputSize < BUFSIZE);
+    assert(ipos + stream->inputSize <= BUFSIZE);
     return stream->openIbuf + ipos;
 }
 
 void snnap_stream_send(struct snnap_stream *stream) {
     ++(stream->numInvocations[ibn]);
     unsigned ipos = stream_pos(stream);
-    assert(ipos < BUFSIZE);
-    if (ipos + stream->inputSize >= BUFSIZE) {
+    assert(ipos <= BUFSIZE);
+    if (ipos + stream->inputSize > BUFSIZE) {
         // Next invocation would fill the buffer. Send.
         snnap_sendbuf();
         stream->openIbuf = 0;
@@ -190,13 +191,13 @@ void snnap_stream_send(struct snnap_stream *stream) {
 
 void snnap_stream_put(struct snnap_stream *stream, const void *data) {
     volatile void *buf = snnap_stream_write(stream);
-    memcpy(buf, data, stream->inputSize);
+    memcpy((void *)buf, data, stream->inputSize);
     snnap_stream_send(stream);
 }
 
 void snnap_stream_barrier(struct snnap_stream *stream) {
     // Finish the last invocation, if anything has been enqueued.
-    if (stream->numInvocations[ibn]) {
+    if (stream->openIbuf) {
         snnap_sendbuf();
     }
 
