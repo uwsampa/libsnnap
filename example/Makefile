@@ -36,4 +36,5 @@ run: $(EXECUTABLE)
 	sleep 3s
 	source $(SETTINGS) ; \
 		xmd -tcl $(RUN_TCL) $(ZYNQBIT) $(PS7_INIT) $(EXECUTABLE)
+	sleep 3
 	cp $(MINICOM) log.txt

@@ -154,7 +154,8 @@ static void stream_consume(struct snnap_stream *stream) {
     const volatile void *buf = snnap_readbuf();
     const volatile void *bufEnd = buf +
         stream->numInvocations[obn] * stream->outputSize;
-    for (const volatile void *pos = buf; pos < bufEnd; ++pos) {
+    for (const volatile void *pos = buf; pos < bufEnd;
+            pos += stream->outputSize) {
         stream->callback(pos);
     }
     snnap_consumebuf();
