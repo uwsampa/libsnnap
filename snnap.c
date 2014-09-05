@@ -1,12 +1,13 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include "xil_types.h"
 #include "xil_mmu.h"
 
 #include "snnap.h"
 
 #define NBUFS 1
-static const unsigned BUFSIZE = 4096;  // Size of each buffer in bytes.
+static const unsigned BUFSIZE = 512;  // Size of each buffer in bytes.
 static volatile void * const ibuf_begin = (void*) 0xFFFF0000;
 static volatile void * const obuf_begin = (void*) 0xFFFF8000;
 static unsigned ibn;  // Which buffer is current?
@@ -173,24 +174,30 @@ volatile void *snnap_stream_write(snnap_stream_t stream) {
     }
 
     unsigned ipos = stream_pos(stream);
-    assert(ipos + stream->inputSize < BUFSIZE);
+    assert(ipos + stream->inputSize <= BUFSIZE);
     return stream->openIbuf + ipos;
 }
 
 void snnap_stream_send(snnap_stream_t stream) {
     ++(stream->numInvocations[ibn]);
     unsigned ipos = stream_pos(stream);
-    assert(ipos < BUFSIZE);
-    if (ipos + stream->inputSize >= BUFSIZE) {
+    assert(ipos <= BUFSIZE);
+    if (ipos + stream->inputSize > BUFSIZE) {
         // Next invocation would fill the buffer. Send.
         snnap_sendbuf();
         stream->openIbuf = 0;
     }
 }
 
+void snnap_stream_put(snnap_stream_t stream, const void *data) {
+    volatile void *buf = snnap_stream_write(stream);
+    memcpy((void *)buf, data, stream->inputSize);
+    snnap_stream_send(stream);
+}
+
 void snnap_stream_barrier(snnap_stream_t stream) {
     // Finish the last invocation, if anything has been enqueued.
-    if (stream->numInvocations[ibn]) {
+    if (stream->openIbuf) {
         snnap_sendbuf();
     }
 

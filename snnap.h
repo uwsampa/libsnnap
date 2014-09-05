@@ -128,6 +128,11 @@ volatile void *snnap_stream_write(snnap_stream_t stream);
  */
 void snnap_stream_send(snnap_stream_t stream);
 
+/* Combination of `snnap_stream_write` and `snnap_stream_send`: put bytes into
+ * the input buffer according to the stream's input size and send.
+ */
+void snnap_stream_put(struct snnap_stream *stream, const void *data);
+
 /* Consume all outputs from the stream.
  */
 void snnap_stream_barrier(snnap_stream_t stream);
