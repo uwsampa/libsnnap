@@ -98,7 +98,7 @@ int main (int argc, const char* argv[]) {
 
     dstData = t1t2_approx;  // For the callback.
     snnap_init();
-    struct snnap_stream *stream = snnap_stream_new(NUM_INPUTS * sizeof(float),
+    snnap_stream_t stream = snnap_stream_new(NUM_INPUTS * sizeof(float),
             NUM_OUTPUTS * sizeof(float), callback);
 
     for (i = 0; i < n * NUM_INPUTS; i += NUM_INPUTS) {
@@ -108,8 +108,7 @@ int main (int argc, const char* argv[]) {
         snnap_stream_send(stream);
     }
 
-    snnap_stream_barrier(stream);
-    free(stream);
+    snnap_stream_free(stream);
 
 #else
 

@@ -114,21 +114,26 @@ Then invoke like this:
  * inputs are sent.
 */
 struct snnap_stream;
-struct snnap_stream *snnap_stream_new(unsigned iSize, unsigned oSize,
+typedef struct snnap_stream *snnap_stream_t;
+snnap_stream_t snnap_stream_new(unsigned iSize, unsigned oSize,
         void (*callback)(const volatile void *));
 
 /* Write a single input to the stream. Use the returned pointer to write
  * exactly the number of bytes declared as the input size for this stream.
  */
-volatile void *snnap_stream_write(struct snnap_stream *stream);
+volatile void *snnap_stream_write(snnap_stream_t stream);
 
 /* Mark the end of writing an input. Call this after every invocation of
  * snnap_stream_write() before moving on to the next input.
  */
-void snnap_stream_send(struct snnap_stream *stream);
+void snnap_stream_send(snnap_stream_t stream);
 
 /* Consume all outputs from the stream.
  */
-void snnap_stream_barrier(struct snnap_stream *stream);
+void snnap_stream_barrier(snnap_stream_t stream);
+
+/* Deallocate a stream object. First executes a barrier.
+ */
+void snnap_stream_free(snnap_stream_t stream);
 
 #endif

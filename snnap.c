@@ -131,10 +131,10 @@ struct snnap_stream {
     volatile void *openIbuf;
 };
 
-struct snnap_stream *snnap_stream_new(
+snnap_stream_t snnap_stream_new(
         unsigned iSize, unsigned oSize, void (*callback)(const volatile void *)
 ) {
-    struct snnap_stream *stream = malloc(sizeof(struct snnap_stream));
+    snnap_stream_t stream = malloc(sizeof(struct snnap_stream));
     stream->inputSize = iSize;
     stream->outputSize = oSize;
     for (unsigned i = 0; i < NBUFS; ++i) {
@@ -145,11 +145,11 @@ struct snnap_stream *snnap_stream_new(
     return stream;
 }
 
-static unsigned stream_pos(struct snnap_stream *stream) {
+static unsigned stream_pos(snnap_stream_t stream) {
     return stream->numInvocations[ibn] * stream->inputSize;
 }
 
-static void stream_consume(struct snnap_stream *stream) {
+static void stream_consume(snnap_stream_t stream) {
     snnap_block();
     const volatile void *buf = snnap_readbuf();
     const volatile void *bufEnd = buf +
@@ -162,7 +162,7 @@ static void stream_consume(struct snnap_stream *stream) {
     stream->numInvocations[obn] = 0;
 }
 
-volatile void *snnap_stream_write(struct snnap_stream *stream) {
+volatile void *snnap_stream_write(snnap_stream_t stream) {
     if (!stream->openIbuf) {
         // No buffer currently open. Get the next one.
         // Make sure we have room to write by consuming prior invocations.
@@ -177,7 +177,7 @@ volatile void *snnap_stream_write(struct snnap_stream *stream) {
     return stream->openIbuf + ipos;
 }
 
-void snnap_stream_send(struct snnap_stream *stream) {
+void snnap_stream_send(snnap_stream_t stream) {
     ++(stream->numInvocations[ibn]);
     unsigned ipos = stream_pos(stream);
     assert(ipos < BUFSIZE);
@@ -188,7 +188,7 @@ void snnap_stream_send(struct snnap_stream *stream) {
     }
 }
 
-void snnap_stream_barrier(struct snnap_stream *stream) {
+void snnap_stream_barrier(snnap_stream_t stream) {
     // Finish the last invocation, if anything has been enqueued.
     if (stream->numInvocations[ibn]) {
         snnap_sendbuf();
@@ -203,4 +203,9 @@ void snnap_stream_barrier(struct snnap_stream *stream) {
         }
     }
     obn = obnOrig;
+}
+
+void snnap_stream_free(snnap_stream_t stream) {
+    snnap_stream_barrier(stream);
+    free(stream);
 }
